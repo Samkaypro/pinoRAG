@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose a new capability or improvement.
+title: "[feature] "
+labels: [feature]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What can you not do today, or what is painful?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Target phase
+      options:
+        - v1 (must ship)
+        - v1.1 (next batch)
+        - v2 (bigger bets)
+        - out of scope
+    validations:
+      required: true
