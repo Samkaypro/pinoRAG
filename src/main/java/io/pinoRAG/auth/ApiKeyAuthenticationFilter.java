@@ -1,8 +1,7 @@
 package io.pinoRAG.auth;
 
-import io.pinoRAG.domain.entity.ApiKeyEntity;
-import io.pinoRAG.domain.repository.ApiKeyRepository;
-import io.pinoRAG.tenant.AuthPrincipalKind;
+import io.pinoRAG.auth.ApiKeyEntity;
+import io.pinoRAG.auth.ApiKeyRepository;
 import io.pinoRAG.tenant.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -14,7 +13,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.time.OffsetDateTime;
 import java.util.Optional;
 
 @Component
@@ -24,13 +22,16 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     private final ApiKeyRepository apiKeys;
     private final ApiKeyHasher hasher;
+    private final ApiKeyUsageTracker usageTracker;
     private final ObjectProvider<TenantContext> tenantContextProvider;
 
     public ApiKeyAuthenticationFilter(ApiKeyRepository apiKeys,
                                       ApiKeyHasher hasher,
+                                      ApiKeyUsageTracker usageTracker,
                                       ObjectProvider<TenantContext> tenantContextProvider) {
         this.apiKeys = apiKeys;
         this.hasher = hasher;
+        this.usageTracker = usageTracker;
         this.tenantContextProvider = tenantContextProvider;
     }
 
@@ -70,11 +71,8 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             ctx.set(key.getTenantId(), key.getId(), AuthPrincipalKind.API_KEY, key.getScopes());
         }
 
-        // Best-effort. A failure here must not block the request.
-        try {
-            apiKeys.touchLastUsed(key.getId(), OffsetDateTime.now());
-        } catch (Exception ignored) {
-        }
+        // Coalesced; the actual DB write happens out of band.
+        usageTracker.touch(key.getId());
 
         chain.doFilter(request, response);
     }

@@ -1,6 +1,5 @@
 package io.pinoRAG.auth;
 
-import io.pinoRAG.tenant.AuthPrincipalKind;
 import io.pinoRAG.tenant.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -34,9 +33,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
 
-        // If the API key filter already authenticated this request, skip.
+        // Only skip when the API key filter already produced a tenant auth.
+        // The default Spring anonymous token also reports isAuthenticated()
+        // as true, so checking the type is what we actually want.
         Authentication existing = SecurityContextHolder.getContext().getAuthentication();
-        if (existing != null && existing.isAuthenticated()) {
+        if (existing instanceof TenantAuthentication) {
             chain.doFilter(request, response);
             return;
         }

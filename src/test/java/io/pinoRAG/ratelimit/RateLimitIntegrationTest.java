@@ -54,8 +54,10 @@ class RateLimitIntegrationTest {
         r.add("spring.datasource.password", POSTGRES::getPassword);
         r.add("pinorag.auth.jwt.secret",
                 () -> "test-secret-test-secret-test-secret-32b");
-        r.add("pinorag.auth.rate-limit.requests-per-minute", () -> String.valueOf(RPM));
-        r.add("pinorag.auth.rate-limit.burst", () -> String.valueOf(RPM));
+        r.add("pinorag.rate-limit.requests-per-minute", () -> String.valueOf(RPM));
+        r.add("pinorag.rate-limit.burst", () -> String.valueOf(RPM));
+        r.add("pinorag.rate-limit.anonymous-requests-per-minute", () -> "1000");
+        r.add("pinorag.embedder.id", () -> "fake");
     }
 
     @Autowired private JdbcTemplate jdbc;

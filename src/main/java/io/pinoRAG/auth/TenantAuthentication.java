@@ -1,6 +1,5 @@
 package io.pinoRAG.auth;
 
-import io.pinoRAG.tenant.AuthPrincipalKind;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;

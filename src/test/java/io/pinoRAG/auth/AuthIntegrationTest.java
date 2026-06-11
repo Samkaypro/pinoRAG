@@ -58,8 +58,10 @@ class AuthIntegrationTest {
         r.add("spring.datasource.username", POSTGRES::getUsername);
         r.add("spring.datasource.password", POSTGRES::getPassword);
         r.add("pinorag.auth.jwt.secret", () -> JWT_SECRET);
-        r.add("pinorag.auth.rate-limit.requests-per-minute", () -> "60");
-        r.add("pinorag.auth.rate-limit.burst", () -> "60");
+        r.add("pinorag.rate-limit.requests-per-minute", () -> "60");
+        r.add("pinorag.rate-limit.burst", () -> "60");
+        r.add("pinorag.rate-limit.anonymous-requests-per-minute", () -> "1000");
+        r.add("pinorag.embedder.id", () -> "fake");
     }
 
     @Autowired private JdbcTemplate jdbc;

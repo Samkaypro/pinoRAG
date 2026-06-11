@@ -3,7 +3,6 @@ package io.pinoRAG.ratelimit;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
-import io.pinoRAG.auth.AuthProperties;
 import io.pinoRAG.tenant.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,7 +17,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 // In-memory token-bucket per API key id. Per process, not cluster-wide.
-// Redis-backed buckets are a Phase 7 follow-up.
 @Component
 public class RateLimitInterceptor implements HandlerInterceptor {
 
@@ -26,10 +24,10 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private final Bandwidth bandwidth;
     private final ObjectProvider<TenantContext> tenantContextProvider;
 
-    public RateLimitInterceptor(AuthProperties props,
+    public RateLimitInterceptor(RateLimitProperties props,
                                 ObjectProvider<TenantContext> tenantContextProvider) {
-        int rpm = props.rateLimit().requestsPerMinute();
-        int burst = Math.max(props.rateLimit().burst(), rpm);
+        int rpm = props.requestsPerMinute();
+        int burst = Math.max(props.burst(), rpm);
         this.bandwidth = Bandwidth.builder()
                 .capacity(burst)
                 .refillGreedy(rpm, Duration.ofMinutes(1))
@@ -45,7 +43,6 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         TenantContext ctx = tenantContextProvider.getIfAvailable();
         if (ctx == null || !ctx.isAuthenticated() || ctx.apiKeyId() == null) {
             // Either anonymous (will fail auth) or JWT (no API key id to key on).
-            // JWT rate limiting is a Phase 7 item.
             return true;
         }
 

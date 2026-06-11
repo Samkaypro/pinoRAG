@@ -51,6 +51,11 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-pinorag}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-pinorag}
       SPRING_AI_OLLAMA_BASE_URL: http://ollama:11434
+      PINORAG_UPLOAD_DIR: /opt/pino/uploads
+      PINORAG_JWT_SECRET: ${PINORAG_JWT_SECRET:-change-me-locally-change-me-locally-change-me-32b}
+      PINORAG_EMBEDDER_ID: ${PINORAG_EMBEDDER_ID:-fake}
+    volumes:
+      - pinorag-uploads:/opt/pino/uploads
     ports:
       - "${APP_PORT:-8080}:8080"
     healthcheck:
@@ -62,3 +67,4 @@ services:
 volumes:
   pinorag-postgres-data:
   pinorag-ollama-data:
+  pinorag-uploads:
