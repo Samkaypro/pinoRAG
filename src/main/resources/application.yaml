@@ -113,3 +113,14 @@ pinorag:
     id: ${PINORAG_EMBEDDER_ID:fake}
   chunker:
     id: ${PINORAG_CHUNKER_ID:fixed}
+  llm:
+    id: ${PINORAG_LLM_ID:fake}
+  query:
+    top-k: ${PINORAG_QUERY_TOP_K:5}
+    min-score: ${PINORAG_QUERY_MIN_SCORE:0.65}
+    context-token-budget: ${PINORAG_QUERY_CONTEXT_TOKENS:3000}
+    max-answer-tokens: ${PINORAG_QUERY_MAX_ANSWER_TOKENS:512}
+    temperature: ${PINORAG_QUERY_TEMPERATURE:0.2}
+    fallback-mode: ${PINORAG_QUERY_FALLBACK_MODE:REFUSE}
+    fallback-message: ${PINORAG_QUERY_FALLBACK_MESSAGE:"I do not have enough context to answer that."}
+    sse-timeout-millis: ${PINORAG_QUERY_SSE_TIMEOUT_MS:300000}
