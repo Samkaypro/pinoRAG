@@ -1,5 +1,6 @@
 package io.pinoRAG.query;
 
+import io.pinoRAG.tenant.TenantContext;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,20 +15,27 @@ public class QueryController {
 
     private final QueryService service;
     private final QueryProperties props;
+    private final TenantContext tenant;
 
-    public QueryController(QueryService service, QueryProperties props) {
+    public QueryController(QueryService service, QueryProperties props, TenantContext tenant) {
         this.service = service;
         this.props = props;
+        this.tenant = tenant;
     }
 
     @PostMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter query(@Valid @RequestBody QueryRequest request) {
+        // Capture the verified caller HERE, on the request thread, while
+        // RequestContextHolder still has attributes set. The virtual thread
+        // below cannot read request-scoped beans because they live in a
+        // ThreadLocal we have not propagated.
+        Long tenantId = tenant.requireTenantId();
+        Long apiKeyId = tenant.apiKeyId();
+
         SseEmitter emitter = new SseEmitter(props.sseTimeoutMillis());
-        // Run on a virtual thread so the request thread returns immediately;
-        // this gets the response headers + first event onto the wire fast.
         Thread.ofVirtual().name("query-" + System.nanoTime()).start(() -> {
             try {
-                service.run(request, emitter);
+                service.run(request, tenantId, apiKeyId, emitter);
             } catch (Exception ex) {
                 emitter.completeWithError(ex);
             }

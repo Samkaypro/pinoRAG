@@ -11,15 +11,15 @@ public record QueryProperties(
         double temperature,
         FallbackMode fallbackMode,
         String fallbackMessage,
-        long sseTimeoutMillis
+        long sseTimeoutMillis,
+        // Bound the LLM_ONLY fallback so a hung provider does not pin a
+        // virtual thread until the SseEmitter timeout fires.
+        long llmTimeoutMillis
 ) {
 
     public enum FallbackMode {
-        // Refuse to answer when no chunk passes the score threshold.
         REFUSE,
-        // Answer using only the LLM (no context). For permissive deployments.
         LLM_ONLY,
-        // Return the configured fallbackMessage verbatim and stop.
         MESSAGE
     }
 }

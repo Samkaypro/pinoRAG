@@ -1,6 +1,6 @@
 package io.pinoRAG.ingest;
 
-import io.pinoRAG.ingest.DocumentUploadService;
+import io.pinoRAG.document.DocumentResponse;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

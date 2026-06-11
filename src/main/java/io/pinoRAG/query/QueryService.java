@@ -1,14 +1,12 @@
 package io.pinoRAG.query;
 
 import io.pinoRAG.ingest.embed.EmbedderSelector;
-import io.pinoRAG.llm.LlmClient;
 import io.pinoRAG.llm.LlmClientSelector;
 import io.pinoRAG.llm.LlmRequest;
 import io.pinoRAG.llm.TokenConsumer;
 import io.pinoRAG.retrieval.ContextAssembler;
 import io.pinoRAG.retrieval.ScoredChunk;
 import io.pinoRAG.retrieval.VectorRetriever;
-import io.pinoRAG.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,16 +17,17 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.Array;
-import java.sql.Connection;
-import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
-// The query orchestrator. The controller hands us an SseEmitter; we own
-// the emit lifecycle from here. Status fires first so callers see bytes
-// before we touch the embedder. Citations land before the first token so
-// the UI can render sources during generation. Query log writes happen
-// AFTER the stream completes so a failed write does not abort the answer.
+// Query orchestrator. Tenant context is passed in as explicit args because
+// this code runs on a virtual thread spawned by the controller; the request
+// scope is not visible here. Status events fire first to keep TTFT low.
+// Citations land before the first token so a UI can render sources during
+// generation. Query log writes happen AFTER the stream so a logging failure
+// never aborts the answer.
 @Service
 public class QueryService {
 
@@ -40,7 +39,6 @@ public class QueryService {
     private final ContextAssembler assembler;
     private final PromptTemplate template;
     private final QueryProperties props;
-    private final TenantContext tenant;
     private final JdbcTemplate jdbc;
 
     public QueryService(EmbedderSelector embedders,
@@ -49,7 +47,6 @@ public class QueryService {
                         ContextAssembler assembler,
                         PromptTemplate template,
                         QueryProperties props,
-                        TenantContext tenant,
                         JdbcTemplate jdbc) {
         this.embedders = embedders;
         this.llms = llms;
@@ -57,13 +54,10 @@ public class QueryService {
         this.assembler = assembler;
         this.template = template;
         this.props = props;
-        this.tenant = tenant;
         this.jdbc = jdbc;
     }
 
-    public void run(QueryRequest request, SseEmitter emitter) {
-        Long tenantId = tenant.requireTenantId();
-        Long apiKeyId = tenant.apiKeyId();
+    public void run(QueryRequest request, Long tenantId, Long apiKeyId, SseEmitter emitter) {
         long startedAt = System.currentTimeMillis();
 
         try {
@@ -84,6 +78,8 @@ public class QueryService {
                 runFallback(emitter, request);
                 logQuery(tenantId, apiKeyId, request.question(), List.of(),
                         System.currentTimeMillis() - startedAt);
+                emit(emitter, "done", new SseEventPayloads.Done(
+                        System.currentTimeMillis() - startedAt, List.of()));
                 emitter.complete();
                 return;
             }
@@ -133,23 +129,37 @@ public class QueryService {
 
     private void runFallback(SseEmitter emitter, QueryRequest req) {
         switch (props.fallbackMode()) {
-            case REFUSE -> {
-                emit(emitter, "token", new SseEventPayloads.Token(
-                        "I do not have any relevant context to answer that."));
-            }
-            case MESSAGE -> {
-                emit(emitter, "token", new SseEventPayloads.Token(props.fallbackMessage()));
-            }
-            case LLM_ONLY -> {
-                LlmRequest noCtx = new LlmRequest(template.system(),
-                        template.user("", req.question()),
-                        props.maxAnswerTokens(), props.temperature());
-                CountdownConsumer cc = new CountdownConsumer(emitter);
-                llms.active().stream(noCtx, cc);
-                cc.awaitTerminal();
-            }
+            case REFUSE -> emit(emitter, "token", new SseEventPayloads.Token(
+                    "I do not have any relevant context to answer that."));
+            case MESSAGE -> emit(emitter, "token", new SseEventPayloads.Token(props.fallbackMessage()));
+            case LLM_ONLY -> runLlmOnlyFallback(emitter, req);
         }
-        emit(emitter, "done", new SseEventPayloads.Done(0L, List.of()));
+    }
+
+    private void runLlmOnlyFallback(SseEmitter emitter, QueryRequest req) {
+        LlmRequest noCtx = new LlmRequest(template.system(),
+                template.user("", req.question()),
+                props.maxAnswerTokens(), props.temperature());
+        CountDownLatch latch = new CountDownLatch(1);
+        llms.active().stream(noCtx, new TokenConsumer() {
+            @Override public void onToken(String text) {
+                emit(emitter, "token", new SseEventPayloads.Token(text));
+            }
+            @Override public void onComplete() { latch.countDown(); }
+            @Override public void onError(Throwable t) {
+                log.error("LLM_ONLY fallback failed", t);
+                latch.countDown();
+            }
+        });
+        try {
+            // Bounded wait so a stuck LLM does not leak the virtual thread
+            // until the SseEmitter's own timeout fires.
+            if (!latch.await(props.llmTimeoutMillis(), TimeUnit.MILLISECONDS)) {
+                log.warn("LLM_ONLY fallback exceeded {} ms", props.llmTimeoutMillis());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void emit(SseEmitter emitter, String event, Object payload) {
@@ -198,22 +208,6 @@ public class QueryService {
             return HexFormat.of().formatHex(d);
         } catch (Exception e) {
             return "";
-        }
-    }
-
-    // Lightweight latch around a TokenConsumer so the LLM_ONLY fallback can
-    // wait for streaming to finish before we emit the trailing done event.
-    private final class CountdownConsumer implements TokenConsumer {
-        private final SseEmitter emitter;
-        private final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
-        CountdownConsumer(SseEmitter emitter) { this.emitter = emitter; }
-        @Override public void onToken(String text) {
-            emit(emitter, "token", new SseEventPayloads.Token(text));
-        }
-        @Override public void onComplete() { latch.countDown(); }
-        @Override public void onError(Throwable t) { latch.countDown(); }
-        void awaitTerminal() {
-            try { latch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         }
     }
 }
