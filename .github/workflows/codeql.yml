@@ -37,10 +37,11 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
+          build-mode: manual
           queries: security-and-quality
 
       - name: build
-        run: ./mvnw -B -ntp -DskipTests package
+        run: ./mvnw -B -ntp -DskipTests -Dmaven.test.skip=true package
 
       - name: analyze
         uses: github/codeql-action/analyze@v3

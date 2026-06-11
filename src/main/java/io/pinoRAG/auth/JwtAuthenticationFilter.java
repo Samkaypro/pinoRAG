@@ -60,12 +60,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 jwt.tenantId(),
                 null,
                 AuthPrincipalKind.JWT,
-                jwt.scopes());
+                jwt.scopes(),
+                jwt.subject(),
+                jwt.groups());
         SecurityContextHolder.getContext().setAuthentication(auth);
 
         TenantContext ctx = tenantContextProvider.getIfAvailable();
         if (ctx != null) {
-            ctx.set(jwt.tenantId(), null, AuthPrincipalKind.JWT, jwt.scopes());
+            ctx.set(jwt.tenantId(), null, AuthPrincipalKind.JWT,
+                    jwt.scopes(), jwt.subject(), jwt.groups());
         }
 
         chain.doFilter(request, response);

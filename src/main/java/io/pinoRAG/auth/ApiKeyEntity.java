@@ -43,6 +43,16 @@ public class ApiKeyEntity {
     @Column(name = "scopes", nullable = false, columnDefinition = "text[]")
     private String[] scopes;
 
+    // Caller identity for per-document ACL enforcement. Both fields are
+    // nullable / empty: an unset subject + empty groups means the key has
+    // no per-document restrictions beyond the tenant filter.
+    @Column(name = "subject", length = 255)
+    private String subject;
+
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "groups", nullable = false, columnDefinition = "text[]")
+    private String[] groups;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

@@ -1,25 +1,29 @@
 package io.pinoRAG.ingest.embed;
 
-import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.ollama.OllamaEmbeddingModel;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-// Wraps Spring AI's Ollama embedding model. The exact response shape varies
-// across Spring AI milestones, so we read the canonical embed(List) method
-// (returns float[][]) and copy each row. Active only when the property
-// selects ollama AND Spring AI autoconfigured an EmbeddingModel bean.
+// Wraps Spring AI's Ollama embedder. We bind to the concrete model class
+// so the ApplicationContext stays unambiguous when both Ollama and OpenAI
+// starters are on the classpath at once. Active when all three hold:
+//   - pinorag.embedder.id = ollama
+//   - the OllamaEmbeddingModel class is on the classpath
+//   - Spring AI actually autoconfigured the bean
 @Component
+@ConditionalOnClass(OllamaEmbeddingModel.class)
 @ConditionalOnProperty(name = "pinorag.embedder.id", havingValue = "ollama")
-@ConditionalOnBean(EmbeddingModel.class)
+@ConditionalOnBean(OllamaEmbeddingModel.class)
 public class OllamaEmbedder implements Embedder {
 
-    private final EmbeddingModel model;
+    private final OllamaEmbeddingModel model;
     private final int dim;
 
-    public OllamaEmbedder(EmbeddingModel model) {
+    public OllamaEmbedder(OllamaEmbeddingModel model) {
         this.model = model;
         this.dim = model.dimensions();
     }
@@ -36,11 +40,6 @@ public class OllamaEmbedder implements Embedder {
 
     @Override
     public List<float[]> embed(List<String> texts) {
-        float[][] raw = model.embed(texts);
-        List<float[]> out = new java.util.ArrayList<>(raw.length);
-        for (float[] row : raw) {
-            out.add(row);
-        }
-        return out;
+        return model.embed(texts);
     }
 }

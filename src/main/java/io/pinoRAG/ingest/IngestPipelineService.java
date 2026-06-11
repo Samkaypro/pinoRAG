@@ -1,9 +1,9 @@
 package io.pinoRAG.ingest;
 
-import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import io.pinoRAG.ingest.chunking.ChunkingStrategy;
+import io.pinoRAG.collection.CollectionSettings;
+import io.pinoRAG.collection.CollectionSettingsLookup;
 import io.pinoRAG.ingest.chunking.ChunkingStrategySelector;
 import io.pinoRAG.ingest.embed.Embedder;
 import io.pinoRAG.ingest.embed.EmbedderSelector;
@@ -37,6 +37,8 @@ public class IngestPipelineService {
     private final JdbcTemplate jdbc;
     private final IngestProperties props;
     private final MeterRegistry meters;
+    private final PiiScrubber pii;
+    private final CollectionSettingsLookup settingsLookup;
 
     // Tracked so graceful shutdown can wait for in-flight pipelines before
     // returning from @PreDestroy. Documents still in PROCESSING after the
@@ -52,7 +54,9 @@ public class IngestPipelineService {
                                  EmbeddingWriter embeddingWriter,
                                  JdbcTemplate jdbc,
                                  IngestProperties props,
-                                 MeterRegistry meters) {
+                                 MeterRegistry meters,
+                                 PiiScrubber pii,
+                                 CollectionSettingsLookup settingsLookup) {
         this.storage = storage;
         this.parsers = parsers;
         this.chunkers = chunkers;
@@ -62,6 +66,8 @@ public class IngestPipelineService {
         this.jdbc = jdbc;
         this.props = props;
         this.meters = meters;
+        this.pii = pii;
+        this.settingsLookup = settingsLookup;
     }
 
     @Async
@@ -92,6 +98,14 @@ public class IngestPipelineService {
         } catch (Exception ex) {
             recordFailure(req, "PARSE", IngestErrorCode.PARSE_FAILED, ex);
             return;
+        }
+
+        // PII scrub happens AFTER parse and BEFORE chunk so the redaction
+        // surfaces in pino_chunks.body and in every downstream search hit.
+        CollectionSettings settings = settingsLookup.forCollection(req.tenantId(), req.collectionId());
+        if (pii.isEnabledFor(settings)) {
+            text = pii.scrub(text);
+            logStage(req, "SCRUB", "SUCCESS", 0, null);
         }
 
         List<String> chunks;

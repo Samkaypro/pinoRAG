@@ -1,10 +1,10 @@
 package io.pinoRAG.ingest;
 
 import io.pinoRAG.collection.CollectionEntity;
-import io.pinoRAG.document.DocumentEntity;
-import io.pinoRAG.document.DocumentStatus;
 import io.pinoRAG.collection.CollectionRepository;
+import io.pinoRAG.document.DocumentEntity;
 import io.pinoRAG.document.DocumentRepository;
+import io.pinoRAG.document.DocumentStatus;
 import io.pinoRAG.tenant.TenantContext;
 import io.pinoRAG.tenant.TenantFilterEnabler;
 import jakarta.persistence.EntityNotFoundException;
@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
+import java.sql.Array;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -52,7 +53,7 @@ public class DocumentUploadService {
     }
 
     @Transactional
-    public DocumentEntity uploadMultipart(Long collectionId, MultipartFile file) {
+    public DocumentEntity uploadMultipart(Long collectionId, MultipartFile file, AclHints acl) {
         Long tenantId = tenant.requireTenantId();
         filterEnabler.enableForCurrentRequest();
 
@@ -66,27 +67,45 @@ public class DocumentUploadService {
 
         UUID docUuid = UUID.randomUUID();
         OffsetDateTime now = OffsetDateTime.now();
+        AclHints safe = acl == null ? AclHints.unrestricted() : acl;
+        String[] groups = safe.groupIds() == null ? new String[0] : safe.groupIds();
 
         Long docId;
         try {
-            docId = jdbc.queryForObject(
-                    "INSERT INTO pino_documents " +
-                            "(uuid, tenant_id, collection_id, source_uri, mime_type, " +
-                            " status, version, created_at, updated_at) " +
-                            "VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?, ?) RETURNING id",
-                    Long.class,
-                    docUuid, tenantId, collection.getId(), filename, mimeType,
-                    version, now, now);
+            docId = jdbc.execute(
+                    (java.sql.Connection con) -> {
+                        Array groupsArray = con.createArrayOf("text", groups);
+                        var ps = con.prepareStatement(
+                                "INSERT INTO pino_documents " +
+                                        "(uuid, tenant_id, collection_id, source_uri, mime_type, " +
+                                        " status, version, owner_subject, group_ids, is_public, " +
+                                        " created_at, updated_at) " +
+                                        "VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, ?) RETURNING id");
+                        ps.setObject(1, docUuid);
+                        ps.setLong(2, tenantId);
+                        ps.setLong(3, collection.getId());
+                        ps.setString(4, filename);
+                        ps.setString(5, mimeType);
+                        ps.setInt(6, version);
+                        ps.setString(7, safe.ownerSubject());
+                        ps.setArray(8, groupsArray);
+                        ps.setBoolean(9, safe.isPublic());
+                        ps.setObject(10, now);
+                        ps.setObject(11, now);
+                        try (var rs = ps.executeQuery()) {
+                            return rs.next() ? rs.getLong(1) : null;
+                        }
+                    });
+            if (docId == null) {
+                throw new IllegalStateException("INSERT returned no document id");
+            }
         } catch (DataIntegrityViolationException ex) {
-            // Concurrent upload of the same source raced us to this version.
             throw new ConcurrentUploadException(filename);
         }
 
         Path stored = storage.persist(tenantId, collection.getId(), docUuid, version, file);
         log.info("Stored upload for doc {} v{} at {}", docId, version, stored);
 
-        // Publish AFTER the transaction commits so the async pipeline can
-        // safely read the row. The listener calls @Async.
         events.publishEvent(new IngestRequestedEvent(new IngestRequest(
                 docId, tenantId, collection.getId(), docUuid, version, mimeType)));
 
@@ -103,6 +122,12 @@ public class DocumentUploadService {
             documents.saveAll(active);
         }
         return max + 1;
+    }
+
+    public record AclHints(String ownerSubject, String[] groupIds, boolean isPublic) {
+        public static AclHints unrestricted() {
+            return new AclHints(null, new String[0], false);
+        }
     }
 
     public static class ConcurrentUploadException extends RuntimeException {

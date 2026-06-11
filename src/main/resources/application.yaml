@@ -44,6 +44,18 @@ spring:
   ai:
     ollama:
       base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://localhost:11434}
+    openai:
+      # #{null} (not empty string) is the correct default. @ConditionalOnProperty
+      # matches the empty string ("" counts as a value), which would activate
+      # Spring AI's autoconfig with empty credentials and break boot. Resolving
+      # to literal null makes the property truly absent so autoconfig skips.
+      api-key: ${SPRING_AI_OPENAI_API_KEY:#{null}}
+      embedding:
+        options:
+          model: ${SPRING_AI_OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+      chat:
+        options:
+          model: ${SPRING_AI_OPENAI_CHAT_MODEL:gpt-4o-mini}
 
   batch:
     job:
@@ -103,6 +115,7 @@ pinorag:
     requests-per-minute: ${PINORAG_RATE_LIMIT_RPM:60}
     burst: ${PINORAG_RATE_LIMIT_BURST:60}
     anonymous-requests-per-minute: ${PINORAG_ANON_RATE_LIMIT_RPM:30}
+    upload-requests-per-minute: ${PINORAG_UPLOAD_RATE_LIMIT_RPM:10}
   ingest:
     upload-dir: ${PINORAG_UPLOAD_DIR:/opt/pino/uploads}
     max-upload-bytes: ${PINORAG_MAX_UPLOAD_BYTES_RAW:26214400}
@@ -113,3 +126,17 @@ pinorag:
     id: ${PINORAG_EMBEDDER_ID:fake}
   chunker:
     id: ${PINORAG_CHUNKER_ID:fixed}
+  llm:
+    id: ${PINORAG_LLM_ID:fake}
+  query:
+    top-k: ${PINORAG_QUERY_TOP_K:5}
+    min-score: ${PINORAG_QUERY_MIN_SCORE:0.65}
+    context-token-budget: ${PINORAG_QUERY_CONTEXT_TOKENS:3000}
+    max-answer-tokens: ${PINORAG_QUERY_MAX_ANSWER_TOKENS:512}
+    temperature: ${PINORAG_QUERY_TEMPERATURE:0.2}
+    fallback-mode: ${PINORAG_QUERY_FALLBACK_MODE:REFUSE}
+    fallback-message: ${PINORAG_QUERY_FALLBACK_MESSAGE:"I do not have enough context to answer that."}
+    sse-timeout-millis: ${PINORAG_QUERY_SSE_TIMEOUT_MS:300000}
+    llm-timeout-millis: ${PINORAG_QUERY_LLM_TIMEOUT_MS:60000}
+    # VECTOR | BM25 | HYBRID
+    retrieval-mode: ${PINORAG_QUERY_RETRIEVAL_MODE:HYBRID}

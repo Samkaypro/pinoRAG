@@ -1,0 +1,88 @@
+package io.pinoRAG.retrieval;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Component;
+
+import java.sql.Array;
+import java.util.List;
+
+// pgvector cosine search via `<=>`. Tenant + collection scope are SQL
+// predicates rather than Hibernate filters because we bypass JPA on the
+// vector path. Distance is converted to similarity (1 - distance) so the
+// ScoredChunk score is intuitive: higher is better.
+//
+// ACL gating happens in the same WHERE clause:
+//   - is_public docs are visible to everyone in the tenant.
+//   - owner_subject IS NULL docs are visible to everyone (legacy data).
+//   - owner_subject = caller subject when the caller owns it.
+//   - group_ids overlaps caller groups when the caller is in a group.
+@Component
+public class VectorRetriever implements Retriever {
+
+    private static final String SEARCH_SQL =
+            "SELECT c.id AS chunk_id, " +
+                    "       c.document_id AS document_id, " +
+                    "       d.source_uri AS document_name, " +
+                    "       c.body AS body, " +
+                    "       e.embedding <=> CAST(? AS vector) AS distance " +
+                    "FROM pino_chunks c " +
+                    "JOIN pino_embeddings e ON e.chunk_id = c.id " +
+                    "JOIN pino_documents d ON d.id = c.document_id " +
+                    "WHERE c.tenant_id = ? " +
+                    "  AND c.collection_id = ? " +
+                    "  AND d.status = 'READY' " +
+                    "  AND (d.is_public = TRUE " +
+                    "       OR d.owner_subject IS NULL " +
+                    "       OR d.owner_subject = ? " +
+                    "       OR d.group_ids && ?) " +
+                    "ORDER BY distance ASC " +
+                    "LIMIT ?";
+
+    private final JdbcTemplate jdbc;
+
+    public VectorRetriever(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    @Override
+    public RetrievalMode mode() {
+        return RetrievalMode.VECTOR;
+    }
+
+    @Override
+    public List<ScoredChunk> search(Long tenantId, Long collectionId, RetrievalQuery query, int k) {
+        float[] vec = query.embedding();
+        if (vec == null || vec.length == 0) {
+            return List.of();
+        }
+        return jdbc.query(
+                SEARCH_SQL,
+                ps -> {
+                    Array groupsArray = ps.getConnection().createArrayOf(
+                            "text", query.groups() == null ? new String[0] : query.groups());
+                    ps.setString(1, formatVector(vec));
+                    ps.setLong(2, tenantId);
+                    ps.setLong(3, collectionId);
+                    ps.setString(4, query.subject());
+                    ps.setArray(5, groupsArray);
+                    ps.setInt(6, k);
+                },
+                (rs, i) -> new ScoredChunk(
+                        rs.getLong("chunk_id"),
+                        rs.getLong("document_id"),
+                        rs.getString("document_name"),
+                        rs.getString("body"),
+                        1.0 - rs.getDouble("distance")));
+    }
+
+    static String formatVector(float[] v) {
+        StringBuilder sb = new StringBuilder(v.length * 8);
+        sb.append('[');
+        for (int i = 0; i < v.length; i++) {
+            if (i > 0) sb.append(',');
+            sb.append(v[i]);
+        }
+        sb.append(']');
+        return sb.toString();
+    }
+}

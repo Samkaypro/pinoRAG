@@ -14,16 +14,22 @@ public class TenantAuthentication extends AbstractAuthenticationToken {
     private final Long apiKeyId;
     private final AuthPrincipalKind kind;
     private final String[] scopes;
+    private final String subject;
+    private final String[] groups;
 
     public TenantAuthentication(Long tenantId,
                                 Long apiKeyId,
                                 AuthPrincipalKind kind,
-                                String[] scopes) {
+                                String[] scopes,
+                                String subject,
+                                String[] groups) {
         super(toAuthorities(scopes));
         this.tenantId = tenantId;
         this.apiKeyId = apiKeyId;
         this.kind = kind;
         this.scopes = scopes == null ? new String[0] : scopes;
+        this.subject = subject;
+        this.groups = groups == null ? new String[0] : groups;
         setAuthenticated(true);
     }
 
@@ -41,6 +47,8 @@ public class TenantAuthentication extends AbstractAuthenticationToken {
     public Long apiKeyId()   { return apiKeyId; }
     public AuthPrincipalKind kind() { return kind; }
     public String[] scopes() { return Arrays.copyOf(scopes, scopes.length); }
+    public String subject()  { return subject; }
+    public String[] groups() { return Arrays.copyOf(groups, groups.length); }
 
     private static List<GrantedAuthority> toAuthorities(String[] scopes) {
         return Stream.of(scopes == null ? new String[0] : scopes)
