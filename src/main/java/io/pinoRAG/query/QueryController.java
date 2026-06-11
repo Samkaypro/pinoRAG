@@ -31,11 +31,13 @@ public class QueryController {
         // ThreadLocal we have not propagated.
         Long tenantId = tenant.requireTenantId();
         Long apiKeyId = tenant.apiKeyId();
+        String subject = tenant.subject();
+        String[] groups = tenant.groups();
 
         SseEmitter emitter = new SseEmitter(props.sseTimeoutMillis());
         Thread.ofVirtual().name("query-" + System.nanoTime()).start(() -> {
             try {
-                service.run(request, tenantId, apiKeyId, emitter);
+                service.run(request, tenantId, apiKeyId, subject, groups, emitter);
             } catch (Exception ex) {
                 emitter.completeWithError(ex);
             }

@@ -63,12 +63,15 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                 key.getTenantId(),
                 key.getId(),
                 AuthPrincipalKind.API_KEY,
-                key.getScopes());
+                key.getScopes(),
+                key.getSubject(),
+                key.getGroups());
         SecurityContextHolder.getContext().setAuthentication(auth);
 
         TenantContext ctx = tenantContextProvider.getIfAvailable();
         if (ctx != null) {
-            ctx.set(key.getTenantId(), key.getId(), AuthPrincipalKind.API_KEY, key.getScopes());
+            ctx.set(key.getTenantId(), key.getId(), AuthPrincipalKind.API_KEY,
+                    key.getScopes(), key.getSubject(), key.getGroups());
         }
 
         // Coalesced; the actual DB write happens out of band.

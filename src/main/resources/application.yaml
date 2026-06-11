@@ -115,6 +115,7 @@ pinorag:
     requests-per-minute: ${PINORAG_RATE_LIMIT_RPM:60}
     burst: ${PINORAG_RATE_LIMIT_BURST:60}
     anonymous-requests-per-minute: ${PINORAG_ANON_RATE_LIMIT_RPM:30}
+    upload-requests-per-minute: ${PINORAG_UPLOAD_RATE_LIMIT_RPM:10}
   ingest:
     upload-dir: ${PINORAG_UPLOAD_DIR:/opt/pino/uploads}
     max-upload-bytes: ${PINORAG_MAX_UPLOAD_BYTES_RAW:26214400}

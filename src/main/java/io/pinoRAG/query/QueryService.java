@@ -59,7 +59,8 @@ public class QueryService {
         this.jdbc = jdbc;
     }
 
-    public void run(QueryRequest request, Long tenantId, Long apiKeyId, SseEmitter emitter) {
+    public void run(QueryRequest request, Long tenantId, Long apiKeyId,
+                    String subject, String[] groups, SseEmitter emitter) {
         long startedAt = System.currentTimeMillis();
 
         try {
@@ -75,7 +76,8 @@ public class QueryService {
             float[] queryVector = needsEmbedding(mode)
                     ? embedders.active().embed(List.of(request.question())).get(0)
                     : null;
-            RetrievalQuery retrievalQuery = new RetrievalQuery(request.question(), queryVector);
+            RetrievalQuery retrievalQuery = new RetrievalQuery(
+                    request.question(), queryVector, subject, groups);
             List<ScoredChunk> ranked = retrievers.forMode(mode).search(
                     tenantId, request.collectionId(), retrievalQuery, k);
 

@@ -2,10 +2,22 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
+    <!--
+        SecretMaskingConverter is wired into the dev/test pattern via %masked.
+        Prod profile uses LogstashEncoder which renders the message field
+        through its own JsonProvider chain; making %masked apply to the
+        JSON output requires a custom JsonProvider that wraps the formatted
+        message. That work is tracked under observability and
+        intentionally not landed here so the broken-config from the v0
+        attempt does not block JSON logging.
+    -->
+    <conversionRule conversionWord="masked"
+                    class="io.pinoRAG.observability.SecretMaskingConverter"/>
+
     <springProfile name="!prod &amp; !production">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{40} - %msg%n</pattern>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{40} - %masked%n</pattern>
             </encoder>
         </appender>
         <root level="INFO">

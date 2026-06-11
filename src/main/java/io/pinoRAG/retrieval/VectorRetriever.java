@@ -3,12 +3,19 @@ package io.pinoRAG.retrieval;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.sql.Array;
 import java.util.List;
 
 // pgvector cosine search via `<=>`. Tenant + collection scope are SQL
 // predicates rather than Hibernate filters because we bypass JPA on the
 // vector path. Distance is converted to similarity (1 - distance) so the
 // ScoredChunk score is intuitive: higher is better.
+//
+// ACL gating happens in the same WHERE clause:
+//   - is_public docs are visible to everyone in the tenant.
+//   - owner_subject IS NULL docs are visible to everyone (legacy data).
+//   - owner_subject = caller subject when the caller owns it.
+//   - group_ids overlaps caller groups when the caller is in a group.
 @Component
 public class VectorRetriever implements Retriever {
 
@@ -24,6 +31,10 @@ public class VectorRetriever implements Retriever {
                     "WHERE c.tenant_id = ? " +
                     "  AND c.collection_id = ? " +
                     "  AND d.status = 'READY' " +
+                    "  AND (d.is_public = TRUE " +
+                    "       OR d.owner_subject IS NULL " +
+                    "       OR d.owner_subject = ? " +
+                    "       OR d.group_ids && ?) " +
                     "ORDER BY distance ASC " +
                     "LIMIT ?";
 
@@ -47,10 +58,14 @@ public class VectorRetriever implements Retriever {
         return jdbc.query(
                 SEARCH_SQL,
                 ps -> {
+                    Array groupsArray = ps.getConnection().createArrayOf(
+                            "text", query.groups() == null ? new String[0] : query.groups());
                     ps.setString(1, formatVector(vec));
                     ps.setLong(2, tenantId);
                     ps.setLong(3, collectionId);
-                    ps.setInt(4, k);
+                    ps.setString(4, query.subject());
+                    ps.setArray(5, groupsArray);
+                    ps.setInt(6, k);
                 },
                 (rs, i) -> new ScoredChunk(
                         rs.getLong("chunk_id"),

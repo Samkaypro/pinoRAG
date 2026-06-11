@@ -59,10 +59,22 @@ public class JwtTokenVerifier {
             if (tenantId == null) {
                 return Optional.empty();
             }
-            return Optional.of(new VerifiedJwt(tenantId, claims.getSubject(), readScopes(claims)));
+            return Optional.of(new VerifiedJwt(
+                    tenantId, claims.getSubject(), readScopes(claims), readGroups(claims)));
         } catch (JwtException | IllegalArgumentException e) {
             return Optional.empty();
         }
+    }
+
+    private static String[] readGroups(Claims claims) {
+        Object g = claims.get("groups");
+        if (g instanceof java.util.Collection<?> c) {
+            return c.stream().map(Object::toString).toArray(String[]::new);
+        }
+        if (g instanceof String s && !s.isBlank()) {
+            return s.split("\\s+");
+        }
+        return new String[0];
     }
 
     private static Long readTenantId(Object raw) {
@@ -104,5 +116,5 @@ public class JwtTokenVerifier {
         // call site so dev experience is not blocked.
     }
 
-    public record VerifiedJwt(Long tenantId, String subject, String[] scopes) {}
+    public record VerifiedJwt(Long tenantId, String subject, String[] scopes, String[] groups) {}
 }

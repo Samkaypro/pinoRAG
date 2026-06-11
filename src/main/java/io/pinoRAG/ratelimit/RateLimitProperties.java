@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record RateLimitProperties(
         int requestsPerMinute,
         int burst,
-        int anonymousRequestsPerMinute
+        int anonymousRequestsPerMinute,
+        int uploadRequestsPerMinute
 ) {
 }

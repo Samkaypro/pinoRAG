@@ -24,12 +24,18 @@ public class DocumentUploadController {
 
     @PostMapping(value = "/{collectionId}/documents",
             consumes = "multipart/form-data")
-    public ResponseEntity<DocumentResponse> upload(@PathVariable Long collectionId,
-                                                   @RequestParam("file") MultipartFile file) {
+    public ResponseEntity<DocumentResponse> upload(
+            @PathVariable Long collectionId,
+            @RequestParam("file") MultipartFile file,
+            // Optional ACL hints. Defaults preserve legacy "tenant-wide" visibility.
+            @RequestParam(value = "ownerSubject", required = false) String ownerSubject,
+            @RequestParam(value = "groupIds",     required = false) String[] groupIds,
+            @RequestParam(value = "isPublic",     required = false, defaultValue = "false") boolean isPublic) {
         if (file == null || file.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        var doc = uploads.uploadMultipart(collectionId, file);
+        var doc = uploads.uploadMultipart(collectionId, file,
+                new DocumentUploadService.AclHints(ownerSubject, groupIds, isPublic));
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(DocumentResponse.from(doc, 0L));
     }

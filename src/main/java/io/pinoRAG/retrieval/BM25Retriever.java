@@ -3,19 +3,14 @@ package io.pinoRAG.retrieval;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.sql.Array;
 import java.util.List;
 
-// Postgres full-text retrieval. body_tsv is a STORED generated column
-// (see V1__init.sql) with a GIN index, so to_tsvector recomputation is
-// not in the hot path.
-//
-// websearch_to_tsquery treats space as AND by default. For BM25-style
-// recall we want OR between terms: a chunk matching ANY query term should
-// be scored. We rewrite the input by inserting the literal token "OR"
-// between whitespace-separated terms; websearch_to_tsquery recognizes the
-// word "OR" as the OR operator. Stopword removal and stemming still apply.
-// ts_rank_cd weights cover-density, so chunks with more distinct query
-// terms close together still rank higher than chunks with just one.
+// Postgres full-text retrieval over the STORED body_tsv generated column.
+// websearch_to_tsquery defaults to AND between terms; we rewrite the input
+// to OR so any single matching term ranks the chunk. Same ACL clause as
+// VectorRetriever (is_public OR owner_subject IS NULL OR owner_subject =
+// caller OR group_ids overlaps caller groups).
 @Component
 public class BM25Retriever implements Retriever {
 
@@ -32,6 +27,10 @@ public class BM25Retriever implements Retriever {
                     "  AND c.collection_id = ? " +
                     "  AND d.status = 'READY' " +
                     "  AND c.body_tsv @@ q.query " +
+                    "  AND (d.is_public = TRUE " +
+                    "       OR d.owner_subject IS NULL " +
+                    "       OR d.owner_subject = ? " +
+                    "       OR d.group_ids && ?) " +
                     "ORDER BY rank DESC " +
                     "LIMIT ?";
 
@@ -59,10 +58,14 @@ public class BM25Retriever implements Retriever {
         return jdbc.query(
                 SEARCH_SQL,
                 ps -> {
+                    Array groupsArray = ps.getConnection().createArrayOf(
+                            "text", query.groups() == null ? new String[0] : query.groups());
                     ps.setString(1, ored);
                     ps.setLong(2, tenantId);
                     ps.setLong(3, collectionId);
-                    ps.setInt(4, k);
+                    ps.setString(4, query.subject());
+                    ps.setArray(5, groupsArray);
+                    ps.setInt(6, k);
                 },
                 (rs, i) -> new ScoredChunk(
                         rs.getLong("chunk_id"),
@@ -72,9 +75,6 @@ public class BM25Retriever implements Retriever {
                         rs.getDouble("rank")));
     }
 
-    // Visible for testing. Splits on whitespace, drops anything that is not
-    // a word character so weird input does not confuse websearch_to_tsquery,
-    // and joins with " OR " so any single term suffices to match.
     static String toOrQuery(String text) {
         String[] tokens = text.trim().split("\\s+");
         StringBuilder sb = new StringBuilder();
