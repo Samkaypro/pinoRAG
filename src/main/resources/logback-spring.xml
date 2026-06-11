@@ -3,13 +3,11 @@
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
     <!--
-        SecretMaskingConverter is wired into the dev/test pattern via %masked.
-        Prod profile uses LogstashEncoder which renders the message field
-        through its own JsonProvider chain; making %masked apply to the
-        JSON output requires a custom JsonProvider that wraps the formatted
-        message. That work is tracked under observability and
-        intentionally not landed here so the broken-config from the v0
-        attempt does not block JSON logging.
+        SecretMaskingConverter is wired into both the dev pattern (via the
+        %masked conversion word below) and the prod JSON output (via the
+        MaskingMessageJsonProvider in the prod profile). Both routes share
+        the same set of regex patterns and stay in sync if the converter
+        adds a new pattern.
     -->
     <conversionRule conversionWord="masked"
                     class="io.pinoRAG.observability.SecretMaskingConverter"/>
@@ -28,17 +26,29 @@
 
     <springProfile name="prod | production">
         <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-                <includeContext>false</includeContext>
-                <includeMdc>true</includeMdc>
-                <fieldNames>
-                    <timestamp>ts</timestamp>
-                    <message>msg</message>
-                    <logger>logger</logger>
-                    <thread>thread</thread>
-                    <level>level</level>
-                    <stackTrace>stack</stackTrace>
-                </fieldNames>
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <providers>
+                    <timestamp>
+                        <fieldName>ts</fieldName>
+                    </timestamp>
+                    <logLevel>
+                        <fieldName>level</fieldName>
+                    </logLevel>
+                    <loggerName>
+                        <fieldName>logger</fieldName>
+                    </loggerName>
+                    <threadName>
+                        <fieldName>thread</fieldName>
+                    </threadName>
+                    <mdc/>
+                    <!-- Custom provider: masks secrets before writing the message field. -->
+                    <provider class="io.pinoRAG.observability.MaskingMessageJsonProvider">
+                        <fieldName>msg</fieldName>
+                    </provider>
+                    <stackTrace>
+                        <fieldName>stack</fieldName>
+                    </stackTrace>
+                </providers>
             </encoder>
         </appender>
         <root level="INFO">

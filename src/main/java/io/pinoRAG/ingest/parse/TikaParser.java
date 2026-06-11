@@ -30,6 +30,9 @@ public class TikaParser implements DocumentParser {
 
     @Override
     public String extract(InputStream source, String mimeType) throws IOException, TikaException, SAXException {
+        if (mimeType != null && mimeType.toLowerCase().startsWith("text/")) {
+            return new String(source.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
         BodyContentHandler handler = new BodyContentHandler(LIMIT);
         Metadata metadata = new Metadata();
         if (mimeType != null && !mimeType.isBlank()) {

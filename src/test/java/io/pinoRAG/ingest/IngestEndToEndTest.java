@@ -9,11 +9,11 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.batch.autoconfigure.BatchAutoConfiguration;
-import org.springframework.boot.data.elasticsearch.autoconfigure.ElasticsearchDataAutoConfiguration;
-import org.springframework.boot.data.elasticsearch.autoconfigure.ElasticsearchRepositoriesAutoConfiguration;
+import org.springframework.boot.data.elasticsearch.autoconfigure.DataElasticsearchAutoConfiguration;
+import org.springframework.boot.data.elasticsearch.autoconfigure.DataElasticsearchRepositoriesAutoConfiguration;
 import org.springframework.boot.elasticsearch.autoconfigure.ElasticsearchClientAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.resttestclient.test.autoconfigure.AutoConfigureTestRestTemplate;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -48,8 +48,8 @@ import static org.awaitility.Awaitility.await;
 @EnableAutoConfiguration(exclude = {
         BatchAutoConfiguration.class,
         ElasticsearchClientAutoConfiguration.class,
-        ElasticsearchDataAutoConfiguration.class,
-        ElasticsearchRepositoriesAutoConfiguration.class,
+        DataElasticsearchAutoConfiguration.class,
+        DataElasticsearchRepositoriesAutoConfiguration.class,
 })
 @Testcontainers
 class IngestEndToEndTest {

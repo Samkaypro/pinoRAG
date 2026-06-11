@@ -64,7 +64,39 @@ services:
       timeout: 5s
       retries: 8
 
+  # compile-only 
+  mvn-compile:
+    image: maven:3.9-eclipse-temurin-21
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - pinorag-m2-cache:/root/.m2
+    command: >
+      ./mvnw -B -ntp
+      -DskipTests -Dmaven.test.skip=true
+      compile
+    profiles: ["tools"]
+
+  # full verify: compile + test + package
+  mvn-test:
+    image: maven:3.9-eclipse-temurin-21
+    working_dir: /workspace
+    # Mount Docker socket so Testcontainers can start Postgres/pgvector.
+    volumes:
+      - .:/workspace
+      - pinorag-m2-cache:/root/.m2
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Tell Testcontainers to use the host Docker socket, not Ryuk.
+    environment:
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+      DOCKER_HOST: unix:///var/run/docker.sock
+    command: >
+      ./mvnw -B -ntp -Dstyle.color=always verify
+    profiles: ["tools"]
+
 volumes:
   pinorag-postgres-data:
   pinorag-ollama-data:
   pinorag-uploads:
+  pinorag-m2-cache:
+

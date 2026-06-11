@@ -4,6 +4,7 @@ import io.pinoRAG.ingest.embed.Embedder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.batch.autoconfigure.BatchAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -56,7 +57,7 @@ class RetrievalBenchmarkTest {
     @Autowired private VectorRetriever vectorRetriever;
     @Autowired private BM25Retriever bm25Retriever;
     @Autowired private HybridRetriever hybridRetriever;
-    @Autowired private Embedder embedder;
+    @Autowired @Qualifier("hashingFakeEmbedder") private Embedder embedder;
 
     private Long tenantA;
     private Long tenantB;

@@ -4,9 +4,11 @@ import io.pinoRAG.ingest.embed.Embedder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.batch.autoconfigure.BatchAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -49,7 +51,7 @@ class AclEnforcementTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private BM25Retriever bm25;
     @Autowired private VectorRetriever vector;
-    @Autowired private Embedder embedder;
+    @Autowired @Qualifier("hashingFakeEmbedder") private Embedder embedder;
 
     private Long tenantId;
     private Long collectionId;
@@ -152,7 +154,7 @@ class AclEnforcementTest {
     // ----- helpers -----
 
     private Long insertDoc(String name, String owner, String[] groups, boolean isPublic) {
-        return jdbc.execute(con -> {
+        return jdbc.execute((ConnectionCallback<Long>) con -> {
             Array g = con.createArrayOf("text", groups);
             var ps = con.prepareStatement(
                     "INSERT INTO pino_documents " +
