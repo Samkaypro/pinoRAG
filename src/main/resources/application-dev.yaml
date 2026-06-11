@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pinorag
+    username: pinorag
+    password: pinorag
+
+  flyway:
+    clean-disabled: true
+
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+logging:
+  level:
+    org.flywaydb: DEBUG
+    org.hibernate.SQL: DEBUG
