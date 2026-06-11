@@ -5,10 +5,11 @@ import io.pinoRAG.ingest.embed.Embedder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.batch.autoconfigure.BatchAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.resttestclient.test.autoconfigure.AutoConfigureTestRestTemplate;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -69,7 +70,7 @@ class QueryEndToEndTest {
 
     @Autowired private JdbcTemplate jdbc;
     @Autowired private TestRestTemplate http;
-    @Autowired private Embedder embedder;
+    @Autowired @Qualifier("hashingFakeEmbedder") private Embedder embedder;
 
     private String apiKey;
     private Long collectionId;
@@ -79,6 +80,7 @@ class QueryEndToEndTest {
 
     @BeforeEach
     void seed() {
+        http.getRestTemplate().setRequestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory());
         jdbc.update("DELETE FROM pino_query_log");
         jdbc.update("DELETE FROM pino_embeddings");
         jdbc.update("DELETE FROM pino_chunks");

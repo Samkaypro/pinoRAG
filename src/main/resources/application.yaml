@@ -1,6 +1,8 @@
 spring:
   application:
     name: pinoRAG
+  main:
+    allow-bean-definition-overriding: true
 
   # Optional .env file in the working directory. Treated as a Java properties
   # file, so KEY=VALUE pairs work; quoting and shell semantics do not.
@@ -70,6 +72,23 @@ server:
   shutdown: graceful
 
 management:
+  tracing:
+    sampling:
+      probability: ${PINORAG_TRACING_SAMPLING:1.0}
+  metrics:
+    distribution:
+      # Histogram buckets are required for histogram_quantile() in Prometheus.
+      percentiles-histogram:
+        "pinorag.query.ttft": true
+        "pinorag.query.latency": true
+        "pinorag.retrieve.latency": true
+        "pinorag.ingest.stage": true
+      # Client-side percentiles emitted as gauges for cheap scraping when
+      # the histogram is not loaded into the backend.
+      percentiles:
+        "pinorag.query.ttft": [0.5, 0.95, 0.99]
+        "pinorag.query.latency": [0.5, 0.95, 0.99]
+        "pinorag.retrieve.latency": [0.5, 0.95]
   endpoints:
     web:
       exposure:
@@ -81,6 +100,8 @@ management:
       probes:
         enabled: true
   health:
+    elasticsearch:
+      enabled: false
     livenessstate:
       enabled: true
     readinessstate:

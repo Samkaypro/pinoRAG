@@ -110,7 +110,8 @@ public class IngestPipelineService {
 
         List<String> chunks;
         try {
-            chunks = timed("chunk", () -> chunkers.active().chunk(text));
+            final String textToChunk = text; // effectively-final copy required by lambda
+            chunks = timed("chunk", () -> chunkers.active().chunk(textToChunk));
         } catch (Exception ex) {
             recordFailure(req, "CHUNK", IngestErrorCode.CHUNK_FAILED, ex);
             return;
