@@ -125,3 +125,5 @@ pinorag:
     fallback-message: ${PINORAG_QUERY_FALLBACK_MESSAGE:"I do not have enough context to answer that."}
     sse-timeout-millis: ${PINORAG_QUERY_SSE_TIMEOUT_MS:300000}
     llm-timeout-millis: ${PINORAG_QUERY_LLM_TIMEOUT_MS:60000}
+    # VECTOR | BM25 | HYBRID
+    retrieval-mode: ${PINORAG_QUERY_RETRIEVAL_MODE:HYBRID}

@@ -1,5 +1,6 @@
 package io.pinoRAG.query;
 
+import io.pinoRAG.retrieval.RetrievalMode;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "pinorag.query")
@@ -12,9 +13,9 @@ public record QueryProperties(
         FallbackMode fallbackMode,
         String fallbackMessage,
         long sseTimeoutMillis,
-        // Bound the LLM_ONLY fallback so a hung provider does not pin a
-        // virtual thread until the SseEmitter timeout fires.
-        long llmTimeoutMillis
+        long llmTimeoutMillis,
+        // Default retrieval mode. Per-request override allowed via QueryRequest.
+        RetrievalMode retrievalMode
 ) {
 
     public enum FallbackMode {

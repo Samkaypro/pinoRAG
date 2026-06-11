@@ -5,12 +5,12 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-// pgvector cosine search via the `<=>` operator. Tenant + collection scope
-// are SQL predicates, not Hibernate filters, because we bypass JPA on the
+// pgvector cosine search via `<=>`. Tenant + collection scope are SQL
+// predicates rather than Hibernate filters because we bypass JPA on the
 // vector path. Distance is converted to similarity (1 - distance) so the
-// score in ScoredChunk is intuitive (higher is better).
+// ScoredChunk score is intuitive: higher is better.
 @Component
-public class VectorRetriever {
+public class VectorRetriever implements Retriever {
 
     private static final String SEARCH_SQL =
             "SELECT c.id AS chunk_id, " +
@@ -33,14 +33,21 @@ public class VectorRetriever {
         this.jdbc = jdbc;
     }
 
-    public List<ScoredChunk> search(Long tenantId, Long collectionId, float[] queryVector, int k) {
-        if (queryVector == null || queryVector.length == 0) {
+    @Override
+    public RetrievalMode mode() {
+        return RetrievalMode.VECTOR;
+    }
+
+    @Override
+    public List<ScoredChunk> search(Long tenantId, Long collectionId, RetrievalQuery query, int k) {
+        float[] vec = query.embedding();
+        if (vec == null || vec.length == 0) {
             return List.of();
         }
         return jdbc.query(
                 SEARCH_SQL,
                 ps -> {
-                    ps.setString(1, formatVector(queryVector));
+                    ps.setString(1, formatVector(vec));
                     ps.setLong(2, tenantId);
                     ps.setLong(3, collectionId);
                     ps.setInt(4, k);

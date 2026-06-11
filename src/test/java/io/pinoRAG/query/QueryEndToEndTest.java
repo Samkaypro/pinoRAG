@@ -164,6 +164,28 @@ class QueryEndToEndTest {
     }
 
     @Test
+    void perRequestModeOverrideIsRespected() {
+        // BM25 mode with a query that matches the seeded chunks by lexical
+        // overlap. Must still produce status -> citation -> token -> done.
+        HttpHeaders h = new HttpHeaders();
+        h.setContentType(MediaType.APPLICATION_JSON);
+        h.add(ApiKeyAuthenticationFilter.HEADER, apiKey);
+        h.setAccept(List.of(MediaType.TEXT_EVENT_STREAM));
+
+        String body = "{\"collectionId\":" + collectionId
+                + ",\"question\":\"answer to life\""
+                + ",\"mode\":\"BM25\"}";
+
+        ResponseEntity<String> r = http.exchange("/v1/query", HttpMethod.POST,
+                new HttpEntity<>(body, h), String.class);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        List<String> events = parseEventNames(r.getBody());
+        assertThat(events).contains("status").contains("citation")
+                .contains("token").contains("done");
+    }
+
+    @Test
     void noAuthHeaderReturns401() {
         HttpHeaders h = new HttpHeaders();
         h.setContentType(MediaType.APPLICATION_JSON);

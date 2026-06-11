@@ -36,11 +36,7 @@ public class OllamaEmbedder implements Embedder {
 
     @Override
     public List<float[]> embed(List<String> texts) {
-        float[][] raw = model.embed(texts);
-        List<float[]> out = new java.util.ArrayList<>(raw.length);
-        for (float[] row : raw) {
-            out.add(row);
-        }
-        return out;
+        // Spring AI 2.0.0-M8+ returns List<float[]> directly from embed(List<String>)
+        return model.embed(texts);
     }
 }

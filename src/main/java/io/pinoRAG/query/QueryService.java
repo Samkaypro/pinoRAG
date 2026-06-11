@@ -5,8 +5,10 @@ import io.pinoRAG.llm.LlmClientSelector;
 import io.pinoRAG.llm.LlmRequest;
 import io.pinoRAG.llm.TokenConsumer;
 import io.pinoRAG.retrieval.ContextAssembler;
+import io.pinoRAG.retrieval.RetrievalMode;
+import io.pinoRAG.retrieval.RetrievalQuery;
+import io.pinoRAG.retrieval.Retrievers;
 import io.pinoRAG.retrieval.ScoredChunk;
-import io.pinoRAG.retrieval.VectorRetriever;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,7 +37,7 @@ public class QueryService {
 
     private final EmbedderSelector embedders;
     private final LlmClientSelector llms;
-    private final VectorRetriever retriever;
+    private final Retrievers retrievers;
     private final ContextAssembler assembler;
     private final PromptTemplate template;
     private final QueryProperties props;
@@ -43,14 +45,14 @@ public class QueryService {
 
     public QueryService(EmbedderSelector embedders,
                         LlmClientSelector llms,
-                        VectorRetriever retriever,
+                        Retrievers retrievers,
                         ContextAssembler assembler,
                         PromptTemplate template,
                         QueryProperties props,
                         JdbcTemplate jdbc) {
         this.embedders = embedders;
         this.llms = llms;
-        this.retriever = retriever;
+        this.retrievers = retrievers;
         this.assembler = assembler;
         this.template = template;
         this.props = props;
@@ -65,10 +67,17 @@ public class QueryService {
 
             int k = request.k() == null ? props.topK() : request.k();
             double minScore = request.minScore() == null ? props.minScore() : request.minScore();
+            RetrievalMode mode = request.mode() == null ? props.retrievalMode() : request.mode();
 
-            float[] queryVector = embedders.active().embed(List.of(request.question())).get(0);
-            List<ScoredChunk> ranked = retriever.search(
-                    tenantId, request.collectionId(), queryVector, k);
+            // Embed only when the chosen mode actually needs a vector.
+            // BM25 reads from the text field; computing the embedding for
+            // that path would be a wasted round-trip to the embedder.
+            float[] queryVector = needsEmbedding(mode)
+                    ? embedders.active().embed(List.of(request.question())).get(0)
+                    : null;
+            RetrievalQuery retrievalQuery = new RetrievalQuery(request.question(), queryVector);
+            List<ScoredChunk> ranked = retrievers.forMode(mode).search(
+                    tenantId, request.collectionId(), retrievalQuery, k);
 
             List<ScoredChunk> passing = ranked.stream()
                     .filter(c -> c.score() >= minScore)
@@ -200,6 +209,10 @@ public class QueryService {
         } catch (Exception ex) {
             log.warn("Failed to write query log", ex);
         }
+    }
+
+    private static boolean needsEmbedding(RetrievalMode mode) {
+        return mode == RetrievalMode.VECTOR || mode == RetrievalMode.HYBRID;
     }
 
     private static String sha256Hex(String s) {
