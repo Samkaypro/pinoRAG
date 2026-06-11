@@ -64,7 +64,7 @@ services:
       timeout: 5s
       retries: 8
 
-  # compile-only 
+  # compile-only
   mvn-compile:
     image: maven:3.9-eclipse-temurin-21
     working_dir: /workspace
@@ -99,4 +99,3 @@ volumes:
   pinorag-ollama-data:
   pinorag-uploads:
   pinorag-m2-cache:
-
