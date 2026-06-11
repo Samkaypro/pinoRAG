@@ -44,6 +44,18 @@ spring:
   ai:
     ollama:
       base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://localhost:11434}
+    openai:
+      # #{null} (not empty string) is the correct default. @ConditionalOnProperty
+      # matches the empty string ("" counts as a value), which would activate
+      # Spring AI's autoconfig with empty credentials and break boot. Resolving
+      # to literal null makes the property truly absent so autoconfig skips.
+      api-key: ${SPRING_AI_OPENAI_API_KEY:#{null}}
+      embedding:
+        options:
+          model: ${SPRING_AI_OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+      chat:
+        options:
+          model: ${SPRING_AI_OPENAI_CHAT_MODEL:gpt-4o-mini}
 
   batch:
     job:

@@ -15,7 +15,7 @@ import java.util.List;
 public class LlmClientSelector {
 
     private static final Logger log = LoggerFactory.getLogger(LlmClientSelector.class);
-    private static final List<String> KNOWN_IDS = List.of("fake", "ollama");
+    private static final List<String> KNOWN_IDS = List.of("fake", "ollama", "openai");
 
     private final List<LlmClient> available;
     private final String configuredId;

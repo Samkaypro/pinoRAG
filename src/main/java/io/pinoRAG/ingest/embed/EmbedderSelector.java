@@ -14,7 +14,7 @@ import java.util.List;
 public class EmbedderSelector {
 
     private static final Logger log = LoggerFactory.getLogger(EmbedderSelector.class);
-    private static final List<String> KNOWN_IDS = List.of("fake", "ollama");
+    private static final List<String> KNOWN_IDS = List.of("fake", "ollama", "openai");
 
     private final List<Embedder> available;
     private final String configuredId;

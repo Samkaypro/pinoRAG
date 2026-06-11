@@ -3,7 +3,7 @@ package io.pinoRAG.llm;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.ollama.OllamaChatModel;
+import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -11,24 +11,26 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-// Bridges Spring AI's OllamaChatModel.stream(Prompt) Flux into our callback
-// shape. Bound to the concrete class so it does not collide with the
-// OpenAI chat bean when both starters are present.
+// Bridges Spring AI's OpenAiChatModel.stream(Prompt) Flux into our callback
+// shape. Active when:
+//   - pinorag.llm.id = openai
+//   - the OpenAiChatModel class is on the classpath
+//   - Spring AI autoconfigured the bean (requires spring.ai.openai.api-key)
 @Component
-@ConditionalOnClass(OllamaChatModel.class)
-@ConditionalOnProperty(name = "pinorag.llm.id", havingValue = "ollama")
-@ConditionalOnBean(OllamaChatModel.class)
-public class OllamaLlmClient implements LlmClient {
+@ConditionalOnClass(OpenAiChatModel.class)
+@ConditionalOnProperty(name = "pinorag.llm.id", havingValue = "openai")
+@ConditionalOnBean(OpenAiChatModel.class)
+public class OpenAILlmClient implements LlmClient {
 
-    private final OllamaChatModel chat;
+    private final OpenAiChatModel chat;
 
-    public OllamaLlmClient(OllamaChatModel chat) {
+    public OpenAILlmClient(OpenAiChatModel chat) {
         this.chat = chat;
     }
 
     @Override
     public String id() {
-        return "ollama";
+        return "openai";
     }
 
     @Override
