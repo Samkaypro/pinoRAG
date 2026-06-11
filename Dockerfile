@@ -12,10 +12,11 @@ RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -ntp -DskipTests package \
 FROM eclipse-temurin:21-jre-jammy AS runtime
 RUN groupadd --system --gid 1001 pino \
     && useradd  --system --uid 1001 --gid pino --home /opt/pino pino \
-    && mkdir -p /opt/pino \
+    && mkdir -p /opt/pino /opt/pino/uploads \
     && chown -R pino:pino /opt/pino
 WORKDIR /opt/pino
 COPY --from=build --chown=pino:pino /workspace/app.jar app.jar
+VOLUME ["/opt/pino/uploads"]
 
 USER pino
 EXPOSE 8080

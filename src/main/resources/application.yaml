@@ -1,3 +1,115 @@
 spring:
   application:
     name: pinoRAG
+
+  # Optional .env file in the working directory. Treated as a Java properties
+  # file, so KEY=VALUE pairs work; quoting and shell semantics do not.
+  config:
+    import: "optional:file:./.env[.properties]"
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/pinorag}
+    username: ${SPRING_DATASOURCE_USERNAME:pinorag}
+    password: ${SPRING_DATASOURCE_PASSWORD:pinorag}
+    hikari:
+      pool-name: pinorag-pool
+      maximum-pool-size: ${SPRING_DATASOURCE_MAX_POOL_SIZE:20}
+      minimum-idle: ${SPRING_DATASOURCE_MIN_IDLE:2}
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    validate-on-migrate: true
+
+  threads:
+    virtual:
+      enabled: true
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: ${PINORAG_MAX_UPLOAD_BYTES:25MB}
+      max-request-size: ${PINORAG_MAX_UPLOAD_BYTES:25MB}
+
+  ai:
+    ollama:
+      base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://localhost:11434}
+
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: never
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: always
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  info:
+    build:
+      enabled: true
+    git:
+      enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    root: INFO
+    io.pinoRAG: DEBUG
+
+pinorag:
+  vector:
+    dimension: 1536
+  auth:
+    jwt:
+      secret: ${PINORAG_JWT_SECRET:change-me-change-me-change-me-change-me-change-me-32b}
+      issuer: ${PINORAG_JWT_ISSUER:}
+      allowed-clock-skew-seconds: ${PINORAG_JWT_CLOCK_SKEW_SECONDS:30}
+    touch-flush-millis: ${PINORAG_API_KEY_TOUCH_FLUSH_MILLIS:10000}
+  rate-limit:
+    requests-per-minute: ${PINORAG_RATE_LIMIT_RPM:60}
+    burst: ${PINORAG_RATE_LIMIT_BURST:60}
+    anonymous-requests-per-minute: ${PINORAG_ANON_RATE_LIMIT_RPM:30}
+  ingest:
+    upload-dir: ${PINORAG_UPLOAD_DIR:/opt/pino/uploads}
+    max-upload-bytes: ${PINORAG_MAX_UPLOAD_BYTES_RAW:26214400}
+    chunk-size: ${PINORAG_CHUNK_SIZE:1000}
+    chunk-overlap: ${PINORAG_CHUNK_OVERLAP:200}
+    embedding-batch-size: ${PINORAG_EMBEDDING_BATCH_SIZE:16}
+  embedder:
+    id: ${PINORAG_EMBEDDER_ID:fake}
+  chunker:
+    id: ${PINORAG_CHUNKER_ID:fixed}
